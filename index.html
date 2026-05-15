@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="商品记录">
+  <title>商品拍照记录</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #f2f2f7;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── 顶部导航 ── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5ea;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 0 14px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+    .btn-header {
+      background: none; border: none;
+      font-size: 15px; cursor: pointer; padding: 8px 2px;
+    }
+    .btn-header.danger { color: #ff3b30; }
+    .btn-header.primary { color: #007aff; }
+    .btn-header:disabled { color: #c7c7cc; pointer-events: none; }
+    .btn-header.right { text-align: right; }
+
+    #clock {
+      font-size: 22px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      color: #1c1c1e;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── 列表区 ── */
+    #list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 0 8px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 55vh;
+      color: #8e8e93;
+      gap: 8px;
+    }
+    .empty-state .icon { font-size: 52px; }
+    .empty-state .t1 { font-size: 17px; font-weight: 500; }
+    .empty-state .t2 { font-size: 14px; }
+
+    .entry-card {
+      background: #fff;
+      margin: 0 14px 10px;
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .entry-num { font-size: 13px; color: #8e8e93; min-width: 20px; text-align: right; }
+    .entry-body { flex: 1; }
+    .entry-code { font-size: 20px; font-weight: 600; }
+    .entry-time { font-size: 13px; color: #8e8e93; margin-top: 3px; }
+    .entry-actions { display: flex; gap: 4px; }
+    .btn-edit {
+      background: none; border: none;
+      color: #007aff; font-size: 18px;
+      cursor: pointer; padding: 6px 8px;
+    }
+    .btn-del {
+      background: none; border: none;
+      color: #ff3b30; font-size: 20px;
+      cursor: pointer; padding: 6px 8px;
+    }
+
+    /* ── 新增按钮 ── */
+    .add-bar {
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      flex-shrink: 0;
+      background: #f2f2f7;
+    }
+    .btn-add {
+      width: 100%;
+      height: 54px;
+      background: #007aff;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .btn-add:active { background: #005ecb; }
+
+    /* ── Bottom Sheet ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.38);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.28s;
+      z-index: 50;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+
+    .sheet {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #f2f2f7;
+      border-radius: 20px 20px 0 0;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      transform: translateY(100%);
+      transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+      z-index: 51;
+      display: flex;
+      flex-direction: column;
+    }
+    .sheet.open { transform: translateY(0); }
+
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: #c7c7cc; border-radius: 2px;
+      margin: 10px auto 4px;
+      flex-shrink: 0;
+    }
+    .sheet-title {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #8e8e93;
+      padding: 4px 0 10px;
+      flex-shrink: 0;
+    }
+
+    /* 显示区 */
+    .display-area {
+      background: #fff;
+      margin: 0 14px 10px;
+      border-radius: 14px;
+      padding: 14px 18px;
+      flex-shrink: 0;
+    }
+    .display-value {
+      font-size: 36px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      min-height: 46px;
+      color: #1c1c1e;
+      word-break: break-all;
+    }
+    .display-value.placeholder {
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: #c7c7cc;
+      padding-top: 8px;
+    }
+    .cursor {
+      display: inline-block;
+      width: 2px; height: 34px;
+      background: #007aff;
+      vertical-align: middle;
+      margin-left: 2px;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* 键盘 */
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 0 14px 10px;
+      flex-shrink: 0;
+    }
+    .key {
+      background: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 26px;
+      font-weight: 400;
+      color: #1c1c1e;
+      cursor: pointer;
+      height: 58px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      user-select: none;
+    }
+    .key:active { background: #e5e5ea; }
+    .key.special { background: #d1d1d6; font-size: 22px; }
+    .key.special:active { background: #c7c7cc; }
+    .key.hyphen { font-size: 34px; font-weight: 300; }
+
+    .btn-confirm {
+      margin: 0 14px;
+      height: 54px;
+      background: #007aff;
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-confirm:active { background: #005ecb; }
+    .btn-confirm:disabled { background: #c7c7cc; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 120px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.72);
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 20px;
+      font-size: 14px;
+      white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+      z-index: 99;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<header>
+  <button class="btn-header danger" id="btn-clear" disabled onclick="clearAll()">清除全部</button>
+  <div id="clock">00:00:00</div>
+  <button class="btn-header primary right" id="btn-download" disabled onclick="downloadJSON()">下载 ↓</button>
+</header>
+
+<!-- 列表 -->
+<div id="list-scroll">
+  <div class="empty-state" id="empty-state">
+    <div class="icon">📷</div>
+    <div class="t1">还没有记录</div>
+    <div class="t2">点下方「+ 新增」开始</div>
+  </div>
+  <div id="list-items"></div>
+</div>
+
+<!-- 新增按钮 -->
+<div class="add-bar">
+  <button class="btn-add" onclick="openSheet(null)">＋ 新增</button>
+</div>
+
+<!-- 遮罩 -->
+<div class="overlay" id="overlay" onclick="closeSheet()"></div>
+
+<!-- 输入面板 -->
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-title">输入编号</div>
+
+  <div class="display-area">
+    <div class="display-value placeholder" id="display">
+      点击数字键入编号<span class="cursor"></span>
+    </div>
+  </div>
+
+  <div class="keypad">
+    <button class="key" onclick="press('1')">1</button>
+    <button class="key" onclick="press('2')">2</button>
+    <button class="key" onclick="press('3')">3</button>
+    <button class="key" onclick="press('4')">4</button>
+    <button class="key" onclick="press('5')">5</button>
+    <button class="key" onclick="press('6')">6</button>
+    <button class="key" onclick="press('7')">7</button>
+    <button class="key" onclick="press('8')">8</button>
+    <button class="key" onclick="press('9')">9</button>
+    <button class="key special hyphen" onclick="press('-')">-</button>
+    <button class="key" onclick="press('0')">0</button>
+    <button class="key special" onclick="backspace()">⌫</button>
+  </div>
+
+  <button class="btn-confirm" id="btn-confirm" disabled onclick="confirmEntry()">确认</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const entries = [];
+  let editIndex = null; // null = 新增，number = 修改
+  let current = '';
+
+  // ── 时钟 ──────────────────────────────────────────
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function tickClock() {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  function fmt(date) {
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
+  function toISO(date) {
+    const off = -date.getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const ah = pad(Math.floor(Math.abs(off) / 60));
+    const am = pad(Math.abs(off) % 60);
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` +
+           `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${ah}:${am}`;
+  }
+
+  // ── 键盘输入 ─────────────────────────────────────
+  function press(ch) {
+    current += ch;
+    updateDisplay();
+  }
+
+  function backspace() {
+    current = current.slice(0, -1);
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    const el = document.getElementById('display');
+    const btn = document.getElementById('btn-confirm');
+    if (current === '') {
+      el.className = 'display-value placeholder';
+      el.innerHTML = '点击数字键入编号<span class="cursor"></span>';
+    } else {
+      el.className = 'display-value';
+      el.innerHTML = current + '<span class="cursor"></span>';
+    }
+    btn.disabled = current === '';
+  }
+
+  // ── Sheet 开关 ────────────────────────────────────
+  function openSheet(index) {
+    editIndex = index;
+    current = index !== null ? entries[index].code : '';
+    document.getElementById('sheet-title').textContent =
+      index !== null ? '修改编号（时间记录不变）' : '输入编号';
+    updateDisplay();
+    document.getElementById('sheet').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+    current = '';
+    editIndex = null;
+    updateDisplay();
+  }
+
+  // ── 确认 ──────────────────────────────────────────
+  function confirmEntry() {
+    if (!current) return;
+    if (editIndex !== null) {
+      // 修改：只改编号，时间不变
+      const old = entries[editIndex].code;
+      entries[editIndex].code = current;
+      showToast(`已修改：${old} → ${current}`);
+    } else {
+      // 新增：记录当前时间
+      entries.push({ code: current, timestamp: new Date() });
+      showToast(`已记录 ${current}  ${fmt(entries[entries.length-1].timestamp)}`);
+    }
+    closeSheet();
+    renderList();
+  }
+
+  // ── 列表渲染 ─────────────────────────────────────
+  function renderList() {
+    const empty = document.getElementById('empty-state');
+    const items = document.getElementById('list-items');
+    const isEmpty = entries.length === 0;
+
+    document.getElementById('btn-clear').disabled = isEmpty;
+    document.getElementById('btn-download').disabled = isEmpty;
+    empty.style.display = isEmpty ? 'flex' : 'none';
+
+    items.innerHTML = entries.map((e, i) => `
+      <div class="entry-card">
+        <span class="entry-num">${i + 1}</span>
+        <div class="entry-body">
+          <div class="entry-code">${e.code}</div>
+          <div class="entry-time">${fmt(e.timestamp)}</div>
+        </div>
+        <div class="entry-actions">
+          <button class="btn-edit" onclick="openSheet(${i})">✏️</button>
+          <button class="btn-del" onclick="deleteEntry(${i})">×</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function deleteEntry(i) {
+    entries.splice(i, 1);
+    renderList();
+  }
+
+  function clearAll() {
+    if (!entries.length) return;
+    if (!confirm('确认清除所有记录？')) return;
+    entries.length = 0;
+    renderList();
+  }
+
+  // ── 下载 ─────────────────────────────────────────
+  function downloadJSON() {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    const payload = {
+      session_date: dateStr,
+      generated_at: toISO(now),
+      entries: entries.map((e, i) => ({
+        index: i + 1,
+        code: e.code,
+        timestamp: toISO(e.timestamp)
+      }))
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `photo_session_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('JSON 已下载到「文件」App');
+  }
+
+  // ── Toast ────────────────────────────────────────
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  renderList();
+</script>
+</body>
+</html>
